@@ -1,128 +1,71 @@
+import os
+import torch
+import wandb
 
-from imports import *
-from config import SAVE_DIR, NUM_EPOCHS
+from config import (
+    BATCH_SIZE, NUM_EPOCHS, LEARNING_RATE,
+    WANDB_PROJECT, DEVICE
+)
+
 from data_loader import get_dataloaders
-from model import build_model, get_device, setup_training
+from model import build_model, setup_training
 from train import train_model
 from evaluate import evaluate_model
 
 
 def main():
-    print("==================================================")
-    print("🦷 Tooth Appearance Classification - Training Start")
-    print("==================================================\n")
+    ROOT_DIR = "/work/yazelelew_phd/Tooth/FerraraDump"
+    SAVE_DIR = "/work/yazelelew_phd/Tooth/ModelsScript"
+    IMG_SIZE = 256
+    USE_PRETRAINED = False
 
-    # --------------------------------------------------
-    # Initialize WandB (one run for entire experiment)
-    # --------------------------------------------------
+    MODEL_NAME = "resnet18_pretrained" if USE_PRETRAINED else "resnet18_scratch"
+
     wandb.init(
-        project="Tooth_Classification_Final",
-        name="ResNet18_Training_Run",
+        project=WANDB_PROJECT,
+        name=f"{MODEL_NAME}_Training_Run",
         config={
-            "batch_size": 16,
+            "batch_size": BATCH_SIZE,
             "epochs": NUM_EPOCHS,
-            "learning_rate": 1e-4,
-            "img_size": 256
+            "learning_rate": LEARNING_RATE,
+            "img_size": IMG_SIZE,
+            "pretrained": USE_PRETRAINED
         }
     )
-
-    # --------------------------------------------------
-    # STEP 1: Load Data
-    # --------------------------------------------------
     train_loader, test_loader, train_dataset, test_dataset = get_dataloaders(
+        root_dir=ROOT_DIR,
+        img_size=IMG_SIZE,
         use_augmentation=True
     )
+    print(f"\nTraining model | pretrained={USE_PRETRAINED}")
 
-    # --------------------------------------------------
-    # STEP 2: Setup Device
-    # --------------------------------------------------
-    device = get_device()
-    print(f"Using device: {device}")
-
-    # ------------------------------------------------------------
-    # TRAINING 1️⃣: Pretrained ResNet18
-    # ------------------------------------------------------------
-    print("\n🔥 Training ResNet18 (Pretrained)...")
-    model_pretrained = build_model(pretrained=True).to(device)
-    criterion_pre, optimizer_pre = setup_training(model_pretrained)
-
-    model_pretrained, hist_pre = train_model(
-        model=model_pretrained,
+    model = build_model(pretrained=USE_PRETRAINED).to(DEVICE)
+    criterion, optimizer = setup_training(model)
+    train_model(
+        model=model,
         train_loader=train_loader,
         test_loader=test_loader,
-        criterion=criterion_pre,
-        optimizer=optimizer_pre,
+        criterion=criterion,
+        optimizer=optimizer,
         num_epochs=NUM_EPOCHS,
-        model_name="resnet18_pretrained",
-        img_size=256,
+        model_name=MODEL_NAME,
+        img_size=IMG_SIZE,
         save_dir=SAVE_DIR
     )
 
-    # ------------------------------------------------------------
-    # TRAINING 2️⃣: ResNet18 from Scratch
-    # ------------------------------------------------------------
-    print("\n🔥 Training ResNet18 (From Scratch)...")
-    model_scratch = build_model(pretrained=False).to(device)
-    criterion_scratch, optimizer_scratch = setup_training(model_scratch)
-
-    model_scratch, hist_scratch = train_model(
-        model=model_scratch,
-        train_loader=train_loader,
+    best_path = os.path.join(SAVE_DIR, f"{MODEL_NAME}_best_{IMG_SIZE}.pth")
+    model.load_state_dict(torch.load(best_path, map_location=DEVICE))
+    evaluate_model(
+        model=model,
         test_loader=test_loader,
-        criterion=criterion_scratch,
-        optimizer=optimizer_scratch,
-        num_epochs=NUM_EPOCHS,
-        model_name="resnet18_scratch",
-        img_size=256,
+        test_dataset=test_dataset,
+        model_name=MODEL_NAME,
+        resolution=IMG_SIZE,
         save_dir=SAVE_DIR
     )
 
-    # --------------------------------------------------
-    # FINAL EVALUATION
-    # --------------------------------------------------
-    print("\n📊 Final Evaluation...")
-
-    # Load best models
-    pretrained_path = os.path.join(SAVE_DIR, "resnet18_pretrained_best_256.pth")
-    scratch_path = os.path.join(SAVE_DIR, "resnet18_scratch_best_256.pth")
-
-    # Evaluate Scratch Model
-    print("\nEvaluating Scratch Model...")
-    model_scratch_eval = build_model(pretrained=False).to(device)
-    model_scratch_eval.load_state_dict(torch.load(scratch_path, map_location=device))
-
-    evaluate_model(
-        model_scratch_eval,
-        test_loader,
-        test_dataset,
-        model_name="ResNet18_Scratch",
-        resolution=256,
-        save_dir=SAVE_DIR
-    )
-
-    # Evaluate Pretrained Model
-    print("\nEvaluating Pretrained Model...")
-    model_pre_eval = build_model(pretrained=True).to(device)
-    model_pre_eval.load_state_dict(torch.load(pretrained_path, map_location=device))
-
-    evaluate_model(
-        model_pre_eval,
-        test_loader,
-        test_dataset,
-        model_name="ResNet18_Pretrained",
-        resolution=256,
-        save_dir=SAVE_DIR
-    )
-
-    # --------------------------------------------------
-    # END
-    # --------------------------------------------------
     wandb.finish()
-
-    print("\n==================================================")
-    print("✅ Training and Evaluation completed successfully!")
-    print(f"📁 Results saved in: {SAVE_DIR}")
-    print("==================================================")
+    print(f"\nDone! Results saved in {SAVE_DIR}")
 
 
 if __name__ == "__main__":

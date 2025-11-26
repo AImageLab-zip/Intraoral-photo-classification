@@ -1,49 +1,23 @@
 
-from imports import *
-from config import CLASSES, LEARNING_RATE, WEIGHT_DECAY
-
-
-# ------------------------------------------------------------
-# STEP 1: Device selection
-# ------------------------------------------------------------
-def get_device():
-    """
-    Return CUDA if available, otherwise CPU.
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"✅ Using device: {device}")
-    return device
-
-
-# ------------------------------------------------------------
-# STEP 2: Model builder
-# ------------------------------------------------------------
+from config import CLASSES, LEARNING_RATE, WEIGHT_DECAY, DEVICE
+from torchvision import models
+import torch.nn as nn
+import torch.optim as optim
 def build_model(pretrained=True, num_classes=len(CLASSES)):
-    """
-    Build a ResNet18 model, optionally using pretrained ImageNet weights.
-
-    Args:
-        pretrained (bool): Use pretrained weights if True.
-        num_classes (int): Number of output classes.
-
-    Returns:
-        model (torch.nn.Module): The initialized ResNet18 model.
-    """
-    model = models.resnet18(pretrained=pretrained)
+    if pretrained:
+        weights = models.ResNet18_Weights.IMAGENET1K_V1
+    else:
+        weights = None
+    model = models.resnet18(weights=weights)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
-
-    print(f"🧠 Built ResNet18 | Pretrained={pretrained} | Classes={num_classes}")
-    return model
-
-
-# ------------------------------------------------------------
-# STEP 3: Training setup (optimizer & loss)
-# ------------------------------------------------------------
+    print(f"Built ResNet18 | pretrained={pretrained} | classes={num_classes}")
+    return model.to(DEVICE)
 def setup_training(model, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY):
-    """
-    Create loss function and optimizer for the model.
-    """
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=lr,
+        weight_decay=weight_decay
+    )
     return criterion, optimizer

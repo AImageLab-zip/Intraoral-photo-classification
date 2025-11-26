@@ -6,27 +6,20 @@ from torchvision import models, transforms
 from PIL import Image
 import pandas as pd
 import shutil
-import json
 
-# ===============================================
-# CLASS DEFINITIONS
-# ===============================================
 CLASSES = ["center", "down", "left", "right", "up"]
 NUM_CLASSES = len(CLASSES)
 
-# ===============================================
-# MODEL LOADER
-# ===============================================
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
 def load_resnet18(model_path):
     model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
     model.eval()
-    return model
 
-# ===============================================
-# TRANSFORMS
-# ===============================================
+    return model
 transform = transforms.Compose([
     transforms.Resize((256, 256)),
     transforms.ToTensor(),
@@ -36,12 +29,10 @@ transform = transforms.Compose([
     )
 ])
 
-# ===============================================
-# PREDICT SINGLE IMAGE
-# ===============================================
 def predict_image(model, img_path):
+
     img = Image.open(img_path).convert("RGB")
-    tensor = transform(img).unsqueeze(0)
+    tensor = transform(img).unsqueeze(0).to(device)
 
     with torch.no_grad():
         outputs = model(tensor)
@@ -50,14 +41,12 @@ def predict_image(model, img_path):
 
     return CLASSES[idx], float(conf * 100)
 
-# ===============================================
-# CLASSIFY FOLDER
-# ===============================================
 def classify_folder(model, folder):
     results = {}
     for fname in os.listdir(folder):
         if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
             continue
+
         img_path = os.path.join(folder, fname)
         pred, conf = predict_image(model, img_path)
 
@@ -71,9 +60,6 @@ def classify_folder(model, folder):
         }
     return results
 
-# ===============================================
-# AUTO-CORRECTION
-# ===============================================
 def fix_class_conflicts(results):
     r = dict(results)
     counts = {c: 0 for c in CLASSES}
@@ -100,10 +86,6 @@ def fix_class_conflicts(results):
             r[fname]["corrected"] = True
 
     return r
-
-# ===============================================
-# SORT IMAGES
-# ===============================================
 def sort_images(results, sort_dir):
     for cls in CLASSES:
         os.makedirs(os.path.join(sort_dir, cls), exist_ok=True)
@@ -112,70 +94,48 @@ def sort_images(results, sort_dir):
         dst = os.path.join(sort_dir, item["prediction_corrected"], item["filename"])
         shutil.copy(item["path"], dst)
 
-# ===============================================
-# RENAME IMAGES
-# ===============================================
 def rename_images(results, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-
-    used = set()   # to avoid overwriting files accidentally
 
     for item in results.values():
         predicted = item["prediction_corrected"]
         new_name = f"{predicted}.png"
-
-        # If name exists → overwrite (because only one image per class is expected)
         dst = os.path.join(output_dir, new_name)
         shutil.copy(item["path"], dst)
 
-        used.add(new_name)
-
-
-# ===============================================
-# MAIN
-# ===============================================
 def main():
-    parser = argparse.ArgumentParser(description="Tooth Classification Inference")
-
+    parser = argparse.ArgumentParser(description="Intraoral-photo-classification Inference")
     parser.add_argument("--patient", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--sort_output", default=None)
     parser.add_argument("--rename_output", default=None)
-
     args = parser.parse_args()
 
     model = load_resnet18(args.model)
-    print("Model loaded.")
+    print("Model loaded on:", device)
 
     results = classify_folder(model, args.patient)
     corrected = fix_class_conflicts(results)
 
     df = pd.DataFrame(corrected).T
 
-    # ---- Save tables ----
     os.makedirs(args.output, exist_ok=True)
-
-    df.to_excel(os.path.join(args.output, "corrected_predictions.xlsx"))
     df.to_csv(os.path.join(args.output, "corrected_predictions.csv"))
-    df.to_json(os.path.join(args.output, "corrected_predictions.json"), indent=4)
+   
+    print("Saved  CSV .")
 
-    print("Saved Excel / CSV / JSON.")
-
-    # ---- Optional sorting ----
     if args.sort_output:
         os.makedirs(args.sort_output, exist_ok=True)
         sort_images(corrected, args.sort_output)
         print("Images sorted into:", args.sort_output)
 
-    # ---- Optional renaming ----
     if args.rename_output:
         os.makedirs(args.rename_output, exist_ok=True)
         rename_images(corrected, args.rename_output)
         print("Images renamed into:", args.rename_output)
 
     print("Done.")
-
 
 if __name__ == "__main__":
     main()
