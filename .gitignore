@@ -2,6 +2,7 @@
 __pycache__
 wandb
 ModelsScript
+FinalPrediction.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
