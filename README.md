@@ -21,7 +21,7 @@ pip install -r requirements.txt
 The framework automatically uses GPU if available; otherwise CPU is used.
 
 
-## 2. Training
+## 2. for Retraining
 
 Run training:
 
@@ -29,7 +29,7 @@ Run training:
 python main.py
 ```
 
-## 3. Inference
+## 3. Inference for use the trained model
 
 ```
 python inference.py     --patient <path_to_patient_folder>     --model <best_model.pth>     --output <results_folder>
