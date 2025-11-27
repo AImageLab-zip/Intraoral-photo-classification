@@ -14,8 +14,8 @@ from evaluate import evaluate_model
 
 
 def main():
-    ROOT_DIR = "/work/yazelelew_phd/Tooth/FerraraDump"
-    SAVE_DIR = "/work/yazelelew_phd/Tooth/ModelsScript"
+    ROOT_DIR = ""
+    SAVE_DIR = ""
     IMG_SIZE = 256
     USE_PRETRAINED = False
 
