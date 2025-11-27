@@ -47,7 +47,7 @@ Final evaluation:
 
 | Model               | Accuracy | Precision | Recall | F1‑Score | Inference Time (sec/img) |
 |---------------------|----------|-----------|--------|----------|----------------------------|
-| ResNet18 Pretrained** |92.09% |92.15%** | 92.09% | 92.08%** | 0.000732 |
+| ResNet18 Pretrained |92.09%    |92.15%     | 92.09% | 92.08% | 0.000732 |
 | ResNet18 Scratch    | 86.98%  | 88.06%    | 86.98% | 86.46%   | 0.000760 |
 
 
